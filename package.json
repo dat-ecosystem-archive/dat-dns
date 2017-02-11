@@ -1,0 +1,28 @@
+{
+  "name": "dat-dns",
+  "version": "1.0.0",
+  "description": "Issue DNS lookups for Dat archives using HTTPS requests to the target host.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/datprotocol/dat-dns.git"
+  },
+  "keywords": [
+    "dat",
+    "dns"
+  ],
+  "author": "Paul Frazee <pfrazee@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/datprotocol/dat-dns/issues"
+  },
+  "homepage": "https://github.com/datprotocol/dat-dns#readme",
+  "dependencies": {
+    "call-me-maybe": "^1.0.1",
+    "debug": "^2.6.1",
+    "memory-cache-ttl": "^1.0.48"
+  }
+}
