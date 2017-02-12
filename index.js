@@ -4,6 +4,7 @@ var url = require('url')
 var https = require('https')
 var cache = require('memory-cache-ttl')
 var maybe = require('call-me-maybe')
+var concat = require('concat-stream')
 
 var DAT_HASH_REGEX = /^[0-9a-f]{64}$/i
 var DEFAULT_DAT_DNS_TTL = 3600 // 1hr
@@ -37,10 +38,10 @@ module.exports = function () {
       path: '/.well-known/dat',
       timeout: 2000
     }, function (res) {
-      var body = ''
       res.setEncoding('utf-8')
-      res.on('data', function (chunk) { body += chunk })
-      res.on('end', function () { parseResult(name, body, resolve, reject) })
+      res.pipe(concat(function (body) {
+        parseResult(name, body, resolve, reject)
+      }))
     }).on('error', function (err) {
       debug('DNS-over-HTTPS lookup failed for name:', name, err)
       cache.set(name, false, 60) // cache the miss for a minute
@@ -88,7 +89,7 @@ module.exports = function () {
   }
 
   return { 
-    resolve: resolveName,
+    resolveName: resolveName,
     flushCache: flushCache
   }
 }
