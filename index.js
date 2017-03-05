@@ -50,6 +50,10 @@ module.exports = function () {
   }
 
   function parseResult (name, body, resolve, reject) {
+    if (!body || typeof body != 'string') {
+      return reject(new Error('DNS record not found'))
+    }
+  
     const lines = body.split('\n')
     let key, ttl
 
