@@ -55,7 +55,7 @@ module.exports = function () {
     }
   
     const lines = body.split('\n')
-    let key, ttl
+    var key, ttl
 
     // parse url
     try {
