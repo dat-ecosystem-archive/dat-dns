@@ -1,6 +1,6 @@
 {
   "name": "dat-dns",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Issue DNS lookups for Dat archives using HTTPS requests to the target host.",
   "main": "index.js",
   "scripts": {
