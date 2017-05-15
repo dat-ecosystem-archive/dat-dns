@@ -11,7 +11,12 @@ var DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 var MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 
 module.exports = function () {
-  function resolveName (name, cb) {
+  function resolveName (name, opts, cb) {
+    if (typeof opts === 'function') {
+      cb = opts
+      opts = null
+    }
+    var ignoreCachedMiss = opts && opts.ignoreCachedMiss
     return maybe(cb, new Promise(function (resolve, reject) {
       // is it a hash?
       if (DAT_HASH_REGEX.test(name)) {
@@ -21,9 +26,11 @@ module.exports = function () {
       // check the cache
       const cachedKey = cache.get(name)
       if (typeof cachedKey !== 'undefined') {
-        debug('DNS-over-HTTPS cache hit for name', name, cachedKey)
-        if (cachedKey) return resolve(cachedKey)
-        else return reject(new Error('DNS record not found'))
+        if (cachedKey || (!cachedKey && !ignoreCachedMiss)) {
+          debug('DNS-over-HTTPS cache hit for name', name, cachedKey)
+          if (cachedKey) return resolve(cachedKey)
+          else return reject(new Error('DNS record not found'))
+        }
       }
 
       // do a dns-over-https lookup

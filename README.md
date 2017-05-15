@@ -11,6 +11,9 @@ var datDns = require('dat-dns')()
 datDns.resolveName('foo.com', function (err, key) { ... })
 datDns.resolveName('foo.com').then(key => ...)
 
+// dont use cached 'misses'
+datDns.resolveName('foo.com', {ignoreCachedMiss: true})
+
 // clear the cache
 datDns.flushCache()
 ```
