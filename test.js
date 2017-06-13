@@ -15,6 +15,19 @@ tape('Successful test against pfrazee.hashbase.io', function (t) {
   })
 })
 
+tape('Works for full URLs', function (t) {
+  datDns.resolveName('dat://40a7f6b6147ae695bcbcff432f684c7bb5291ea339c28c1755896cdeb80bd2f9', function (err, name) {
+    t.error(err)
+    t.ok(/[0-9a-f]{64}/.test(name))
+    
+    datDns.resolveName('dat://pfrazee.hashbase.io/foo.txt?bar=baz', function (err, name) {
+      t.error(err)
+      t.ok(/[0-9a-f]{64}/.test(name))
+      t.end()
+    })
+  })
+})
+
 tape('A bad hostname fails gracefully', function (t) {
   datDns.resolveName('example.com', function (err, name) {
     t.ok(err)

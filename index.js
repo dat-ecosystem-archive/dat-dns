@@ -18,6 +18,10 @@ module.exports = function () {
     }
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
     return maybe(cb, new Promise(function (resolve, reject) {
+      // parse the name as needed
+      var nameParsed = url.parse(name)
+      name = nameParsed.hostname || nameParsed.pathname
+
       // is it a hash?
       if (DAT_HASH_REGEX.test(name)) {
         return resolve(name)
