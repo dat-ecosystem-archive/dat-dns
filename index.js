@@ -2,7 +2,7 @@ var debug = require('debug')('dat')
 var dns = require('dns')
 var url = require('url')
 var https = require('https')
-var cache = require('memory-cache-ttl')
+var cache = require('./cache')
 var maybe = require('call-me-maybe')
 var concat = require('concat-stream')
 
@@ -99,12 +99,17 @@ module.exports = function () {
     resolve(key)
   }
 
+  function listCache () {
+    return cache.list()
+  }
+
   function flushCache () {
     cache.flush()
   }
 
   return { 
     resolveName: resolveName,
+    listCache: listCache,
     flushCache: flushCache
   }
 }

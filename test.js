@@ -58,3 +58,8 @@ tape('Successful test against www.datprotocol.com', function (t) {
     })
   })
 })
+
+tape('List cache', function (t) {
+  t.is(Object.keys(datDns.listCache()).length, 3)
+  t.end()
+})
