@@ -14,6 +14,12 @@ datDns.resolveName('foo.com').then(key => ...)
 // dont use cached 'misses'
 datDns.resolveName('foo.com', {ignoreCachedMiss: true})
 
+// dont use the cache at all
+datDns.resolveName('foo.com', {ignoreCache: true})
+
+// list all entries in the cache
+datDns.listCache()
+
 // clear the cache
 datDns.flushCache()
 ```

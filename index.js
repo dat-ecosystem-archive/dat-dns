@@ -16,6 +16,7 @@ module.exports = function () {
       cb = opts
       opts = null
     }
+    var ignoreCache = opts && opts.ignoreCache
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
     return maybe(cb, new Promise(function (resolve, reject) {
       // parse the name as needed
@@ -28,12 +29,14 @@ module.exports = function () {
       }
 
       // check the cache
-      const cachedKey = cache.get(name)
-      if (typeof cachedKey !== 'undefined') {
-        if (cachedKey || (!cachedKey && !ignoreCachedMiss)) {
-          debug('DNS-over-HTTPS cache hit for name', name, cachedKey)
-          if (cachedKey) return resolve(cachedKey)
-          else return reject(new Error('DNS record not found'))
+      if (!ignoreCache) {
+        const cachedKey = cache.get(name)
+        if (typeof cachedKey !== 'undefined') {
+          if (cachedKey || (!cachedKey && !ignoreCachedMiss)) {
+            debug('DNS-over-HTTPS cache hit for name', name, cachedKey)
+            if (cachedKey) return resolve(cachedKey)
+            else return reject(new Error('DNS record not found'))
+          }
         }
       }
 
