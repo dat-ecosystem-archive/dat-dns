@@ -6,7 +6,8 @@ var cache = require('./cache')
 var maybe = require('call-me-maybe')
 var concat = require('concat-stream')
 
-var DAT_HASH_REGEX = /^[0-9a-f]{64}$/i
+var DAT_HASH_REGEX = /^[0-9a-f]{64}?$/i
+var VERSION_REGEX = /(\+[0-9]+)$/
 var DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 var MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 
@@ -23,9 +24,12 @@ module.exports = function () {
       var nameParsed = url.parse(name)
       name = nameParsed.hostname || nameParsed.pathname
 
+      // strip the version
+      name = name.replace(VERSION_REGEX, '')
+
       // is it a hash?
       if (DAT_HASH_REGEX.test(name)) {
-        return resolve(name)
+        return resolve(name.slice(0, 64))
       }
 
       // check the cache
@@ -67,7 +71,7 @@ module.exports = function () {
     if (!body || typeof body != 'string') {
       return reject(new Error('DNS record not found'))
     }
-  
+
     const lines = body.split('\n')
     var key, ttl
 
@@ -110,7 +114,7 @@ module.exports = function () {
     cache.flush()
   }
 
-  return { 
+  return {
     resolveName: resolveName,
     listCache: listCache,
     flushCache: flushCache
