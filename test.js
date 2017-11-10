@@ -84,3 +84,37 @@ tape('List cache', function (t) {
   t.is(Object.keys(datDns.listCache()).length, 3)
   t.end()
 })
+
+tape('Persistent fallback cache', function (t) {
+  t.plan(8)
+
+  var persistentCache = {
+    read: function (name, err) {
+      if (name === 'foo') return '40a7f6b6147ae695bcbcff432f684c7bb5291ea339c28c1755896cdeb80bd2f9'
+      throw err
+    },
+    write: function (name, key, ttl) {
+      t.deepEqual(name, 'pfrazee.hashbase.io')
+      t.ok(/[0-9a-f]{64}/.test(key))
+    }
+  }
+
+  var datDns = require('./index')({persistentCache})
+
+  datDns.resolveName('pfrazee.hashbase.io', function (err, key) {
+    t.error(err)
+    t.ok(/[0-9a-f]{64}/.test(key))
+
+    datDns.resolveName('foo', function (err, key) {
+      t.error(err)
+      t.deepEqual(key, '40a7f6b6147ae695bcbcff432f684c7bb5291ea339c28c1755896cdeb80bd2f9')
+
+      datDns.resolveName('bar', function (err, key) {
+        t.ok(err)
+        t.notOk(key)
+
+        t.end()
+      })
+    })
+  })
+})

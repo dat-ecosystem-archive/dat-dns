@@ -2,7 +2,7 @@ var debug = require('debug')('dat')
 var dns = require('dns')
 var url = require('url')
 var https = require('https')
-var cache = require('./cache')
+var memoryCache = require('./cache')
 var maybe = require('call-me-maybe')
 var concat = require('concat-stream')
 
@@ -11,7 +11,11 @@ var VERSION_REGEX = /(\+[0-9]+)$/
 var DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 var MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 
-module.exports = function () {
+module.exports = function (datDnsOpts) {
+  datDnsOpts = datDnsOpts || {}
+  var pCache = datDnsOpts.persistentCache
+  var mCache = memoryCache()
+
   function resolveName (name, opts, cb) {
     if (typeof opts === 'function') {
       cb = opts
@@ -19,7 +23,7 @@ module.exports = function () {
     }
     var ignoreCache = opts && opts.ignoreCache
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
-    return maybe(cb, new Promise(function (resolve, reject) {
+    var promise = new Promise(function (resolve, reject) {
       // parse the name as needed
       var nameParsed = url.parse(name)
       name = nameParsed.hostname || nameParsed.pathname
@@ -34,7 +38,7 @@ module.exports = function () {
 
       // check the cache
       if (!ignoreCache) {
-        const cachedKey = cache.get(name)
+        const cachedKey = mCache.get(name)
         if (typeof cachedKey !== 'undefined') {
           if (cachedKey || (!cachedKey && !ignoreCachedMiss)) {
             debug('DNS-over-HTTPS cache hit for name', name, cachedKey)
@@ -46,7 +50,15 @@ module.exports = function () {
 
       // do a dns-over-https lookup
       requestRecord(name, resolve, reject)
-    }))
+    })
+
+    // read from persistent cache on failure
+    if (pCache) {
+      promise = promise.catch(function (err) { return pCache.read(name, err) })
+    }
+
+    maybe(cb, promise)
+    return promise
   }
 
   function requestRecord (name, resolve, reject) {
@@ -62,7 +74,7 @@ module.exports = function () {
       }))
     }).on('error', function (err) {
       debug('DNS-over-HTTPS lookup failed for name:', name, err)
-      cache.set(name, false, 60) // cache the miss for a minute
+      mCache.set(name, false, 60) // cache the miss for a minute
       reject(new Error('DNS record not found'))
     })
   }
@@ -100,18 +112,19 @@ module.exports = function () {
 
     // cache
     if (ttl !== 0) {
-      cache.set(name, key, ttl)
+      mCache.set(name, key, ttl)
     }
+    if (pCache) pCache.write(name, key, ttl)
     debug('DNS-over-HTTPS resolved', name, 'to', key)
     resolve(key)
   }
 
   function listCache () {
-    return cache.list()
+    return mCache.list()
   }
 
   function flushCache () {
-    cache.flush()
+    mCache.flush()
   }
 
   return {

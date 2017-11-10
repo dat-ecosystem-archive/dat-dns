@@ -22,6 +22,21 @@ datDns.listCache()
 
 // clear the cache
 datDns.flushCache()
+
+// use a persistent fallback cache
+// (this is handy for persistent dns data when offline)
+var datDns = require('dat-dns')({
+  persistentCache: {
+    read: async (name, err) => {
+      // try lookup
+      // if failed, you can throw the original error:
+      throw err
+    },
+    write: async (name, key, ttl) => {
+      // write to your cache
+    }
+  }
+})
 ```
 
 ## Spec
