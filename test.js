@@ -118,3 +118,21 @@ tape('Persistent fallback cache', function (t) {
     })
   })
 })
+
+tape('Persistent fallback cache doesnt override live results', function (t) {
+  var persistentCache = {
+    read: function (name, err) {
+      if (name === 'pfrazee.hashbase.io') return 'from-cache'
+      throw err
+    },
+    write: function (name, key, ttl) {}
+  }
+
+  var datDns = require('./index')({persistentCache})
+
+  datDns.resolveName('pfrazee.hashbase.io', function (err, key) {
+    t.error(err)
+    t.ok(/[0-9a-f]{64}/.test(key))
+    t.end()
+  })
+})
