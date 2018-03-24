@@ -5,6 +5,7 @@ var https = require('https')
 var memoryCache = require('./cache')
 var maybe = require('call-me-maybe')
 var concat = require('concat-stream')
+var tlds = require('tlds')
 
 var DAT_HASH_REGEX = /^[0-9a-f]{64}?$/i
 var VERSION_REGEX = /(\+[0-9]+)$/
@@ -13,6 +14,7 @@ var MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 
 module.exports = function (datDnsOpts) {
   datDnsOpts = datDnsOpts || {}
+  var datAddr = datDnsOpts.addressBooks
   var pCache = datDnsOpts.persistentCache
   var mCache = memoryCache()
 
@@ -34,6 +36,15 @@ module.exports = function (datDnsOpts) {
       // is it a hash?
       if (DAT_HASH_REGEX.test(name)) {
         return resolve(name.slice(0, 64))
+      }
+
+      // lookup in addressbooks
+      if (datAddr) {
+        var parts = name.split('.')
+        var tld = parts.pop()
+        if (!tlds.includes(tld)) {
+          return lookupAddress(tld, parts, resolve, reject)
+        }
       }
 
       // check the cache
@@ -77,6 +88,10 @@ module.exports = function (datDnsOpts) {
       mCache.set(name, false, 60) // cache the miss for a minute
       reject(new Error('DNS record not found'))
     })
+  }
+
+  function lookupAddress (tld, parts, resolve, reject) {
+    reject(new Error('Invalid top-level domain: .' + tld))
   }
 
   function parseResult (name, body, resolve, reject) {

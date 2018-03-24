@@ -139,3 +139,15 @@ tape('Persistent fallback cache doesnt override live results', function (t) {
     t.end()
   })
 })
+
+tape('Dat address books support', function (t) {
+  var addressBooks = {}
+
+  var datDns = require('./index')({addressBooks})
+
+  datDns.resolveName('dat.local', function (err, key) {
+    t.ok(err)
+    t.error(key)
+    t.end()
+  })
+})
