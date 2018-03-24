@@ -68,12 +68,12 @@ tape('A bad hostname fails gracefully', function (t) {
   })
 })
 
-tape('Successful test against www.datprotocol.com', function (t) {
-  datDns.resolveName('www.datprotocol.com', function (err, name) {
+tape('Successful test against beakerbrowser.com', function (t) {
+  datDns.resolveName('beakerbrowser.com', function (err, name) {
     t.error(err)
     t.ok(/[0-9a-f]{64}/.test(name))
 
-    datDns.resolveName('www.datprotocol.com').then(function (name2) {
+    datDns.resolveName('beakerbrowser.com').then(function (name2) {
       t.equal(name, name2)
       t.end()
     }).catch(function (err) {
