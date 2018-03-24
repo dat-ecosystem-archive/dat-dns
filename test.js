@@ -76,6 +76,9 @@ tape('Successful test against www.datprotocol.com', function (t) {
     datDns.resolveName('www.datprotocol.com').then(function (name2) {
       t.equal(name, name2)
       t.end()
+    }).catch(function (err) {
+      t.error(err)
+      t.end()
     })
   })
 })
