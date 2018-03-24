@@ -43,7 +43,7 @@ module.exports = function (datDnsOpts) {
         var parts = name.split('.')
         var tld = parts.pop()
         if (!tlds.includes(tld)) {
-          return lookupAddress(tld, parts, resolve, reject)
+          return lookupAddress(name, tld, parts, resolve, reject)
         }
       }
 
@@ -90,8 +90,20 @@ module.exports = function (datDnsOpts) {
     })
   }
 
-  function lookupAddress (tld, parts, resolve, reject) {
-    reject(new Error('Invalid top-level domain: .' + tld))
+  function lookupAddress (name, tld, parts, resolve, reject) {
+    var addr = datAddr[tld]
+    if (!addr) {
+      // no addressbook for requested TLD
+      reject(new Error('Invalid top-level domain: .' + tld))
+    } else if (typeof addr.readFile != 'function') {
+      // addressbook is not a valid `hyperdrive` instance
+      reject(new Error('Addressbook should be valid hyperdrive instance'))
+    } else {
+      var record = '/' + parts.reverse().join('/')
+      addr.readFile(record, 'utf-8', function (err, body) {
+        parseResult(name, body, resolve, reject)
+      })
+    }
   }
 
   function parseResult (name, body, resolve, reject) {
