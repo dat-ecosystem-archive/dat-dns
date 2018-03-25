@@ -14,7 +14,7 @@ var MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 
 module.exports = function (datDnsOpts) {
   datDnsOpts = datDnsOpts || {}
-  var datAddr = datDnsOpts.addressBooks
+  var datAddr = datDnsOpts.useAddressBooks ? {} : null
   var pCache = datDnsOpts.persistentCache
   var mCache = memoryCache()
 
@@ -93,11 +93,7 @@ module.exports = function (datDnsOpts) {
   function lookupAddress (name, tld, parts, resolve, reject) {
     var addr = datAddr[tld]
     if (!addr) {
-      // no addressbook for requested TLD
       reject(new Error('Invalid top-level domain: .' + tld))
-    } else if (typeof addr.readFile != 'function') {
-      // addressbook is not a valid `hyperdrive` instance
-      reject(new Error('Addressbook should be valid hyperdrive instance'))
     } else {
       var record = '/' + parts.reverse().join('/')
       addr.readFile(record, 'utf-8', function (err, body) {
@@ -146,6 +142,24 @@ module.exports = function (datDnsOpts) {
     resolve(key)
   }
 
+  function setAddressBook (tld, dat, cb) {
+    var promise = new Promise(function (resolve, reject) {
+      if (!datAddr) {
+        reject(new Error('Use of dat addressbooks is disabled'))
+      } else if (datAddr[tld] || tlds.includes(tld)) {
+        reject(new Error('Top-level domain already in use: .' + tld))
+      } else if (typeof dat.readFile != 'function') {
+        reject(new Error('Addressbook should be valid hyperdrive instance'))
+      } else {
+        datAddr[tld] = dat
+        resolve()
+      }
+    })
+
+    maybe(cb, promise)
+    return promise
+  }
+
   function listCache () {
     return mCache.list()
   }
@@ -157,6 +171,7 @@ module.exports = function (datDnsOpts) {
   return {
     resolveName: resolveName,
     listCache: listCache,
-    flushCache: flushCache
+    flushCache: flushCache,
+    setAddressBook: setAddressBook
   }
 }
