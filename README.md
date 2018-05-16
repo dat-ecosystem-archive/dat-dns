@@ -17,11 +17,23 @@ datDns.resolveName('foo.com', {ignoreCachedMiss: true})
 // dont use the cache at all
 datDns.resolveName('foo.com', {ignoreCache: true})
 
+// dont use dns-over-https
+datDns.resolveName('foo.com', {noDnsOverHttps: true})
+
+// dont use .well-known/dat
+datDns.resolveName('foo.com', {noWellknownDat: true})
+
 // list all entries in the cache
 datDns.listCache()
 
 // clear the cache
 datDns.flushCache()
+
+// configure the DNS-over-HTTPS host used
+var datDns = require('dat-dns')({
+  dnsHost: 'dns.google.com',
+  dnsPath: '/resolve'
+})
 
 // use a persistent fallback cache
 // (this is handy for persistent dns data when offline)
@@ -41,9 +53,15 @@ var datDns = require('dat-dns')({
 
 ## Spec
 
-[In detail.](https://github.com/beakerbrowser/beaker/wiki/Authenticated-Dat-URLs-and-HTTPS-to-Dat-Discovery)
+[In detail.](https://www.datprotocol.com/deps/0005-dns/)
 
-Place a file at `/.well-known/dat` with the following schema:
+**Option 1. (DNS-over-HTTPS)** Create a DNS TXT record witht he following schema:
+
+```
+DATKEY={key}
+```
+
+**Option 2. (.wellknown/dat)** Place a file at `/.well-known/dat` with the following schema:
 
 ```
 {dat-url}
@@ -51,16 +69,3 @@ TTL={time in seconds}
 ```
 
 TTL is optional and will default to `3600` (one hour). If set to `0`, the entry is not cached.
-
-### Dat-name Resolution
-
-Resolution of a site at `dat://hostname` will occur with the following process:
-
- - Browser checks its dat names cache. If a non-expired entry is found, return with the entry.
- - Browser issues a GET request to `https://hostname/.well-known/dat`.
- - If the server responds with a `404 Not Found` status, store a null entry in the cache with a TTL of `3600` and return a failed lookup.
- - If the server responds with anything other than a `200 OK` status, return a failed lookup.
- - If the server responds with a malformed file, return a failed lookup.
- - If the response includes no TTL, set to default `3600`.
- - If the response includes a non-zero TTL, store the entry in the dat-name cache.
- - Return the entry.

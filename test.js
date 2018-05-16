@@ -68,6 +68,14 @@ tape('A bad hostname fails gracefully', function (t) {
   })
 })
 
+tape('A bad DNS record fails gracefully', function (t) {
+  datDns.resolveName('bad-dat-record1.beakerbrowser.com', function (err, name) {
+    t.ok(err)
+    t.notOk(name)
+    t.end()
+  })
+})
+
 tape('Successful test against beakerbrowser.com', function (t) {
   datDns.resolveName('beakerbrowser.com', function (err, name) {
     t.error(err)
@@ -83,8 +91,38 @@ tape('Successful test against beakerbrowser.com', function (t) {
   })
 })
 
+tape('Successful test against beakerbrowser.com (no dns-over-https)', function (t) {
+  datDns.resolveName('beakerbrowser.com', {noDnsOverHttps: true}, function (err, name) {
+    t.error(err)
+    t.ok(/[0-9a-f]{64}/.test(name))
+
+    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+      t.equal(name, name2)
+      t.end()
+    }).catch(function (err) {
+      t.error(err)
+      t.end()
+    })
+  })
+})
+
+tape('Successful test against beakerbrowser.com (no well-known/dat)', function (t) {
+  datDns.resolveName('beakerbrowser.com', {noWellknownDat: true}, function (err, name) {
+    t.error(err)
+    t.ok(/[0-9a-f]{64}/.test(name))
+
+    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+      t.equal(name, name2)
+      t.end()
+    }).catch(function (err) {
+      t.error(err)
+      t.end()
+    })
+  })
+})
+
 tape('List cache', function (t) {
-  t.is(Object.keys(datDns.listCache()).length, 4)
+  t.is(Object.keys(datDns.listCache()).length, 5)
   t.end()
 })
 

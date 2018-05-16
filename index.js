@@ -1,14 +1,17 @@
-var debug = require('debug')('dat')
-var url = require('url')
-var https = require('https')
-var memoryCache = require('./cache')
-var callMeMaybe = require('call-me-maybe')
-var concat = require('concat-stream')
+const debug = require('debug')('dat')
+const url = require('url')
+const https = require('https')
+const {stringify} = require('querystring')
+const memoryCache = require('./cache')
+const callMeMaybe = require('call-me-maybe')
+const concat = require('concat-stream')
 
-var DAT_HASH_REGEX = /^[0-9a-f]{64}?$/i
-var VERSION_REGEX = /(\+[0-9]+)$/
-var DEFAULT_DAT_DNS_TTL = 3600 // 1hr
-var MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
+const DAT_HASH_REGEX = /^[0-9a-f]{64}?$/i
+const VERSION_REGEX = /(\+[0-9]+)$/
+const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
+const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
+const DEFAULT_DNS_HOST = 'dns.google.com'
+const DEFAULT_DNS_PATH = '/resolve'
 
 // helper to call promise-generating function
 function maybe (cb, p) {
@@ -22,6 +25,8 @@ module.exports = function (datDnsOpts) {
   datDnsOpts = datDnsOpts || {}
   var pCache = datDnsOpts.persistentCache
   var mCache = memoryCache()
+  var dnsHost = datDnsOpts.dnsHost || DEFAULT_DNS_HOST
+  var dnsPath = datDnsOpts.dnsPath || DEFAULT_DNS_PATH
 
   function resolveName (name, opts, cb) {
     if (typeof opts === 'function') {
@@ -30,6 +35,8 @@ module.exports = function (datDnsOpts) {
     }
     var ignoreCache = opts && opts.ignoreCache
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
+    var noDnsOverHttps = opts && opts.noDnsOverHttps
+    var noWellknownDat = opts && opts.noWellknownDat
     return maybe(cb, async function () {
       // parse the name as needed
       var nameParsed = url.parse(name)
@@ -56,26 +63,46 @@ module.exports = function (datDnsOpts) {
           }
         }
 
-        // do a .well-known/dat lookup
-        var res = await fetchWellKnownRecord(name)
-        if (res.statusCode === 0 || res.statusCode === 404) {
-          debug('.well-known/dat lookup failed for name:', name, res.statusCode, res.err)
-          mCache.set(name, false, 60) // cache the miss for a minute
-          throw new Error('DNS record not found')
-        } else if (res.statusCode !== 200) {
-          debug('.well-known/dat lookup failed for name:', name, res.statusCode)
-          throw new Error('DNS record not found')
+        var res
+        var key
+        var ttl
+
+        if (!noDnsOverHttps) {
+          try {
+            // do a DNS-over-HTTPS lookup
+            res = await fetchDnsOverHttpsRecord(name, {host: dnsHost, path: dnsPath})
+
+            // parse the record
+            res = parseDnsOverHttpsRecord(name, res.body)
+            debug('dns-over-http resolved', name, 'to', res.key)
+          } catch (e) {
+            // ignore, we'll try .well-known/dat next
+            res = false
+          }
         }
 
-        // parse the record
-        var {key, ttl} = parseWellknownDatRecord(name, res.body)
-        debug('.well-known/dat resolved', name, 'to', key)
+        if (!res && !noWellknownDat) {
+          // do a .well-known/dat lookup
+          res = await fetchWellKnownRecord(name)
+          if (res.statusCode === 0 || res.statusCode === 404) {
+            debug('.well-known/dat lookup failed for name:', name, res.statusCode, res.err)
+            mCache.set(name, false, 60) // cache the miss for a minute
+            throw new Error('DNS record not found')
+          } else if (res.statusCode !== 200) {
+            debug('.well-known/dat lookup failed for name:', name, res.statusCode)
+            throw new Error('DNS record not found')
+          }
+
+          // parse the record
+          res = parseWellknownDatRecord(name, res.body)
+          debug('.well-known/dat resolved', name, 'to', res.key)
+        }
 
         // cache
-        if (ttl !== 0) mCache.set(name, key, ttl)
-        if (pCache) pCache.write(name, key, ttl)
+        if (res.ttl !== 0) mCache.set(name, res.key, res.ttl)
+        if (pCache) pCache.write(name, res.key, res.ttl)
 
-        return key
+        return res.key
       } catch (err) {
         if (pCache) {
           // read from persistent cache on failure
@@ -99,6 +126,72 @@ module.exports = function (datDnsOpts) {
     listCache: listCache,
     flushCache: flushCache
   }
+}
+
+function fetchDnsOverHttpsRecord (name, {host, path}) {
+  return new Promise((resolve, reject) => {
+    var query = {
+      name,
+      type: 'TXT'
+    }
+    debug('dns-over-https lookup for name:', name)
+    https.get({
+      host,
+      path: `${path}?${stringify(query)}`,
+      timeout: 2000
+    }, function (res) {
+      res.setEncoding('utf-8')
+      res.pipe(concat(body => resolve({statusCode: res.statusCode, body})))
+    }).on('error', function (err) {
+      resolve({statusCode: 0, err, body: ''})
+    })
+  })
+}
+
+function parseDnsOverHttpsRecord (name, body) {
+  // decode to obj
+  var record
+  try {
+    record = JSON.parse(body)
+  } catch (e) {
+    debug('dns-over-https failed', name, 'did not give a valid JSON response')
+    throw new Error('Invalid dns-over-https record, must provide json')
+  }
+
+  // find valid answers
+  var answers = record['Answer']
+  if (!answers || !Array.isArray(answers)) {
+    debug('dns-over-https failed', name, 'did not give any TXT answers')
+    throw new Error('Invalid dns-over-https record, no TXT answers given')
+  }
+  answers = answers.filter(a => {
+    if (!a || typeof a !== 'object') {
+      return false
+    }
+    if (typeof a.data !== 'string') {
+      return false
+    }
+    var match = /^"?datkey=([0-9a-f]{64})"?$/i.exec(a.data)
+    if (!match) {
+      return false
+    }
+    a.key = match[1]
+    return true
+  })
+  if (!answers[0]) {
+    debug('dns-over-https failed', name, 'did not give any TXT datkey answers')
+    throw new Error('Invalid dns-over-https record, no TXT datkey answer given')
+  }
+
+  // put together res
+  var res = {key: answers[0].key, ttl: answers[0].TTL}
+  if (!Number.isSafeInteger(res.ttl) || res.ttl < 0) {
+    res.ttl = DEFAULT_DAT_DNS_TTL
+  }
+  if (res.ttl > MAX_DAT_DNS_TTL) {
+    res.ttl = MAX_DAT_DNS_TTL
+  }
+  return res
 }
 
 function fetchWellKnownRecord (name) {
