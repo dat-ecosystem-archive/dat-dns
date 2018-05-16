@@ -55,13 +55,13 @@ var datDns = require('dat-dns')({
 
 [In detail.](https://www.datprotocol.com/deps/0005-dns/)
 
-**Option 1. (DNS-over-HTTPS)** Create a DNS TXT record witht he following schema:
+**Option 1 (DNS-over-HTTPS).** Create a DNS TXT record witht he following schema:
 
 ```
 DATKEY={key}
 ```
 
-**Option 2. (.wellknown/dat)** Place a file at `/.well-known/dat` with the following schema:
+**Option 2 (.well-known/dat).** Place a file at `/.well-known/dat` with the following schema:
 
 ```
 {dat-url}
