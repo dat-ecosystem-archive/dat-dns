@@ -84,7 +84,7 @@ tape('Successful test against beakerbrowser.com', function (t) {
 })
 
 tape('List cache', function (t) {
-  t.is(Object.keys(datDns.listCache()).length, 3)
+  t.is(Object.keys(datDns.listCache()).length, 4)
   t.end()
 })
 
