@@ -13,6 +13,9 @@ const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 const DEFAULT_DNS_HOST = 'dns.google.com'
 const DEFAULT_DNS_PATH = '/resolve'
 
+// helper to support node6
+function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
+
 // helper to call promise-generating function
 function maybe (cb, p) {
   if (typeof p === 'function') {
@@ -37,7 +40,7 @@ module.exports = function (datDnsOpts) {
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
     var noDnsOverHttps = opts && opts.noDnsOverHttps
     var noWellknownDat = opts && opts.noWellknownDat
-    return maybe(cb, async function () {
+    return maybe(cb, _asyncToGenerator(function* () {
       // parse the name as needed
       var nameParsed = url.parse(name)
       name = nameParsed.hostname || nameParsed.pathname
@@ -70,7 +73,7 @@ module.exports = function (datDnsOpts) {
         if (!noDnsOverHttps) {
           try {
             // do a DNS-over-HTTPS lookup
-            res = await fetchDnsOverHttpsRecord(name, {host: dnsHost, path: dnsPath})
+            res = yield fetchDnsOverHttpsRecord(name, {host: dnsHost, path: dnsPath})
 
             // parse the record
             res = parseDnsOverHttpsRecord(name, res.body)
@@ -83,7 +86,7 @@ module.exports = function (datDnsOpts) {
 
         if (!res && !noWellknownDat) {
           // do a .well-known/dat lookup
-          res = await fetchWellKnownRecord(name)
+          res = yield fetchWellKnownRecord(name)
           if (res.statusCode === 0 || res.statusCode === 404) {
             debug('.well-known/dat lookup failed for name:', name, res.statusCode, res.err)
             mCache.set(name, false, 60) // cache the miss for a minute
@@ -110,7 +113,7 @@ module.exports = function (datDnsOpts) {
         }
         throw err
       }
-    })
+    }))
   }
 
   function listCache () {
