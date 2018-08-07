@@ -36,6 +36,19 @@ tape('Works for versioned keys and URLs', function (t) {
     })
 })
 
+tape('Works for non-numeric versioned keys and URLs', function (t) {
+    datDns.resolveName('40a7f6b6147ae695bcbcff432f684c7bb5291ea339c28c1755896cdeb80bd2f9+foo', function (err, name) {
+      t.error(err)
+      t.equal(name, '40a7f6b6147ae695bcbcff432f684c7bb5291ea339c28c1755896cdeb80bd2f9')
+
+      datDns.resolveName('pfrazee.hashbase.io+foo', function (err, name) {
+        t.error(err)
+        t.ok(/[0-9a-f]{64}/.test(name))
+        t.end()
+      })
+    })
+})
+
 tape('Works for full URLs', function (t) {
   datDns.resolveName('dat://40a7f6b6147ae695bcbcff432f684c7bb5291ea339c28c1755896cdeb80bd2f9', function (err, name) {
     t.error(err)
