@@ -49,6 +49,11 @@ var datDns = require('dat-dns')({
     }
   }
 })
+
+// emits some events, mainly useful for logging/debugging
+datDns.on('resolved', ({method, name, key}) => {...})
+datDns.on('failed', ({method, name, err}) => {...})
+datDns.on('cache-flushed', () => {...})
 ```
 
 ## Spec

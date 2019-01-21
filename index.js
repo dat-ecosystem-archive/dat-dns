@@ -1,6 +1,7 @@
 const debug = require('debug')('dat')
 const url = require('url')
 const https = require('https')
+const Emitter = require('events')
 const {stringify} = require('querystring')
 const memoryCache = require('./cache')
 const callMeMaybe = require('call-me-maybe')
@@ -30,6 +31,8 @@ module.exports = function (datDnsOpts) {
   var mCache = memoryCache()
   var dnsHost = datDnsOpts.dnsHost || DEFAULT_DNS_HOST
   var dnsPath = datDnsOpts.dnsPath || DEFAULT_DNS_PATH
+
+  var datDns = new Emitter()
 
   function resolveName (name, opts, cb) {
     if (typeof opts === 'function') {
@@ -76,7 +79,12 @@ module.exports = function (datDnsOpts) {
             res = yield fetchDnsOverHttpsRecord(name, {host: dnsHost, path: dnsPath})
 
             // parse the record
-            res = parseDnsOverHttpsRecord(name, res.body)
+            res = parseDnsOverHttpsRecord(datDns, name, res.body)
+            datDns.emit('resolved', {
+              method: 'dns-over-https',
+              name,
+              key: res.key
+            })
             debug('dns-over-http resolved', name, 'to', res.key)
           } catch (e) {
             // ignore, we'll try .well-known/dat next
@@ -89,15 +97,30 @@ module.exports = function (datDnsOpts) {
           res = yield fetchWellKnownRecord(name)
           if (res.statusCode === 0 || res.statusCode === 404) {
             debug('.well-known/dat lookup failed for name:', name, res.statusCode, res.err)
+            datDns.emit('failed', {
+              method: 'well-known',
+              name,
+              err: 'HTTP code ' + res.statusCode + ' ' + res.err
+            })
             mCache.set(name, false, 60) // cache the miss for a minute
             throw new Error('DNS record not found')
           } else if (res.statusCode !== 200) {
             debug('.well-known/dat lookup failed for name:', name, res.statusCode)
+            datDns.emit('failed', {
+              method: 'well-known',
+              name,
+              err: 'HTTP code ' + res.statusCode
+            })
             throw new Error('DNS record not found')
           }
 
           // parse the record
-          res = parseWellknownDatRecord(name, res.body)
+          res = parseWellknownDatRecord(datDns, name, res.body)
+          datDns.emit('resolved', {
+            method: 'well-known',
+            name,
+            key: res.key
+          })
           debug('.well-known/dat resolved', name, 'to', res.key)
         }
 
@@ -121,14 +144,14 @@ module.exports = function (datDnsOpts) {
   }
 
   function flushCache () {
+    datDns.emit('cache-flushed')
     mCache.flush()
   }
 
-  return {
-    resolveName: resolveName,
-    listCache: listCache,
-    flushCache: flushCache
-  }
+  datDns.resolveName = resolveName
+  datDns.listCache = listCache
+  datDns.flushCache = flushCache
+  return datDns
 }
 
 function fetchDnsOverHttpsRecord (name, {host, path}) {
@@ -151,13 +174,18 @@ function fetchDnsOverHttpsRecord (name, {host, path}) {
   })
 }
 
-function parseDnsOverHttpsRecord (name, body) {
+function parseDnsOverHttpsRecord (datDns, name, body) {
   // decode to obj
   var record
   try {
     record = JSON.parse(body)
   } catch (e) {
     debug('dns-over-https failed', name, 'did not give a valid JSON response')
+    datDns.emit('failed', {
+      method: 'dns-over-https',
+      name,
+      err: 'Failed to parse JSON response'
+    })
     throw new Error('Invalid dns-over-https record, must provide json')
   }
 
@@ -165,6 +193,11 @@ function parseDnsOverHttpsRecord (name, body) {
   var answers = record['Answer']
   if (!answers || !Array.isArray(answers)) {
     debug('dns-over-https failed', name, 'did not give any TXT answers')
+    datDns.emit('failed', {
+      method: 'dns-over-https',
+      name,
+      err: 'Did not give any TXT answers'
+    })
     throw new Error('Invalid dns-over-https record, no TXT answers given')
   }
   answers = answers.filter(a => {
@@ -183,6 +216,11 @@ function parseDnsOverHttpsRecord (name, body) {
   })
   if (!answers[0]) {
     debug('dns-over-https failed', name, 'did not give any TXT datkey answers')
+    datDns.emit('failed', {
+      method: 'dns-over-https',
+      name,
+      err: 'Did not give any TXT datkey answers'
+    })
     throw new Error('Invalid dns-over-https record, no TXT datkey answer given')
   }
 
@@ -213,8 +251,13 @@ function fetchWellKnownRecord (name) {
   })
 }
 
-function parseWellknownDatRecord (name, body) {
+function parseWellknownDatRecord (datDns, name, body) {
   if (!body || typeof body != 'string') {
+    datDns.emit('failed', {
+      method: 'well-known',
+      name,
+      err: 'Empty response'
+    })
     throw new Error('DNS record not found')
   }
 
@@ -226,6 +269,11 @@ function parseWellknownDatRecord (name, body) {
     key = /^dat:\/\/([0-9a-f]{64})/i.exec(lines[0])[1]
   } catch (e) {
     debug('.well-known/dat failed', name, 'Must be a dat://{key} url')
+    datDns.emit('failed', {
+      method: 'well-known',
+      name,
+      err: 'Record did not provide a valid dat://{key} url'
+    })
     throw new Error('Invalid .well-known/dat record, must provide a dat://{key} url')
   }
 
@@ -235,6 +283,11 @@ function parseWellknownDatRecord (name, body) {
       ttl = +(/^ttl=(\d+)$/i.exec(lines[1])[1])
     }
   } catch (e) {
+    datDns.emit('failed', {
+      method: 'well-known',
+      name,
+      err: 'Failed to parse TTL line, error: ' + e.toString()
+    })
     debug('.well-known/dat failed to parse TTL for %s, line: %s, error:', name, lines[1], e)
   }
   if (!Number.isSafeInteger(ttl) || ttl < 0) {
