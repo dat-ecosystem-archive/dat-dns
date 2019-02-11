@@ -11,8 +11,7 @@ const DAT_HASH_REGEX = /^[0-9a-f]{64}?$/i
 const VERSION_REGEX = /(\+[^\/]+)$/
 const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
-const DEFAULT_DNS_HOST = 'dns.google.com'
-const DEFAULT_DNS_PATH = '/resolve'
+const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com','/dns-query'],['dns.google.com','/resolve'],['dns.quad9.net','/dns-query']]
 
 // helper to support node6
 function _asyncToGenerator(fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step(key, arg) { try { var info = gen[key](arg); var value = info.value; } catch (error) { reject(error); return; } if (info.done) { resolve(value); } else { return Promise.resolve(value).then(function (value) { step("next", value); }, function (err) { step("throw", err); }); } } return step("next"); }); }; }
@@ -29,8 +28,14 @@ module.exports = function (datDnsOpts) {
   datDnsOpts = datDnsOpts || {}
   var pCache = datDnsOpts.persistentCache
   var mCache = memoryCache()
-  var dnsHost = datDnsOpts.dnsHost || DEFAULT_DNS_HOST
-  var dnsPath = datDnsOpts.dnsPath || DEFAULT_DNS_PATH
+  if (!datDnsOpts.dnsHost || !datDnsOpts.dnsPath) {
+    let dnsProvider = DEFAULT_DNS_PROVIDERS[Math.floor(Math.random()*DEFAULT_DNS_PROVIDERS.length)];
+    var dnsHost = dnsProvider[0]
+    var dnsPath = dnsProvider[1]
+  } else {
+    var dnsHost = datDnsOpts.dnsHost
+    var dnsPath = datDnsOpts.dnsPath
+  }
 
   var datDns = new Emitter()
 
@@ -156,6 +161,19 @@ module.exports = function (datDnsOpts) {
 
 function fetchDnsOverHttpsRecord (name, {host, path}) {
   return new Promise((resolve, reject) => {
+    // ensure the name is a FQDN
+    if (!name.contains('.')) {
+      debug('dns-over-https failed', name, 'Not an a FQDN')
+      datDns.emit('failed', {
+        method: 'dns-over-https',
+        name,
+        err: 'Name is not a FQDN'
+      })
+      reject('Domain is not a FQDN.')
+    }
+    else if (!name.endsWith('.')) {
+      name = name+'.'
+    }
     var query = {
       name,
       type: 'TXT'
