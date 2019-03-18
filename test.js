@@ -89,6 +89,14 @@ tape('A bad DNS record fails gracefully', function (t) {
   })
 })
 
+tape('Unqualified domain fails gracefully', function (t) {
+  datDns.resolveName('bad-dat-domain-name', function (err, name) {
+    t.ok(err)
+    t.notOk(name)
+    t.end()
+  })
+})
+
 tape('Successful test against beakerbrowser.com', function (t) {
   datDns.resolveName('beakerbrowser.com', function (err, name) {
     t.error(err)
@@ -135,7 +143,7 @@ tape('Successful test against beakerbrowser.com (no well-known/dat)', function (
 })
 
 tape('List cache', function (t) {
-  t.is(Object.keys(datDns.listCache()).length, 5)
+  t.is(Object.keys(datDns.listCache()).length, 6)
   t.end()
 })
 
