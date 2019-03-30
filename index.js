@@ -182,6 +182,10 @@ function fetchDnsOverHttpsRecord (name, {host, path}) {
     https.get({
       host,
       path: `${path}?${stringify(query)}`,
+      // Cloudflare requires this exact header; luckily everyone else ignores it
+      headers: {
+        'Accept': 'application/dns-json'
+      },
       timeout: 2000
     }, function (res) {
       res.setEncoding('utf-8')
