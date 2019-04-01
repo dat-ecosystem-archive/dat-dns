@@ -162,7 +162,7 @@ module.exports = function (datDnsOpts) {
 function fetchDnsOverHttpsRecord (name, {host, path}) {
   return new Promise((resolve, reject) => {
     // ensure the name is a FQDN
-    if (!name.contains('.')) {
+    if (!name.includes('.')) {
       debug('dns-over-https failed', name, 'Not an a FQDN')
       datDns.emit('failed', {
         method: 'dns-over-https',
