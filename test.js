@@ -63,7 +63,7 @@ tape('Works for full URLs', function (t) {
 })
 
 tape('A bad hostname fails gracefully', function (t) {
-  datDns.resolveName('example.com', function (err, name) {
+  datDns.resolveName('example.com', {ignoreCache: true}, function (err, name) {
     t.ok(err)
     t.notOk(name)
 
@@ -71,7 +71,7 @@ tape('A bad hostname fails gracefully', function (t) {
       t.ok(err)
       t.notOk(name)
 
-      datDns.resolveName('foo bar', function (err, name) {
+      datDns.resolveName('foo bar', {ignoreCache: true}, function (err, name) {
         t.ok(err)
         t.notOk(name)
 
@@ -82,7 +82,7 @@ tape('A bad hostname fails gracefully', function (t) {
 })
 
 tape('A bad DNS record fails gracefully', function (t) {
-  datDns.resolveName('bad-dat-record1.beakerbrowser.com', function (err, name) {
+  datDns.resolveName('bad-dat-record1.beakerbrowser.com', {ignoreCache: true}, function (err, name) {
     t.ok(err)
     t.notOk(name)
     t.end()
@@ -90,7 +90,7 @@ tape('A bad DNS record fails gracefully', function (t) {
 })
 
 tape('Unqualified domain fails gracefully', function (t) {
-  datDns.resolveName('bad-dat-domain-name', function (err, name) {
+  datDns.resolveName('bad-dat-domain-name', {ignoreCache: true}, function (err, name) {
     t.ok(err)
     t.notOk(name)
     t.end()
@@ -98,7 +98,7 @@ tape('Unqualified domain fails gracefully', function (t) {
 })
 
 tape('Successful test against beakerbrowser.com', function (t) {
-  datDns.resolveName('beakerbrowser.com', function (err, name) {
+  datDns.resolveName('beakerbrowser.com', {ignoreCache: true}, function (err, name) {
     t.error(err)
     t.ok(/[0-9a-f]{64}/.test(name))
 
@@ -113,7 +113,7 @@ tape('Successful test against beakerbrowser.com', function (t) {
 })
 
 tape('Successful test against beakerbrowser.com (no dns-over-https)', function (t) {
-  datDns.resolveName('beakerbrowser.com', {noDnsOverHttps: true}, function (err, name) {
+  datDns.resolveName('beakerbrowser.com', {noDnsOverHttps: true, ignoreCache: true}, function (err, name) {
     t.error(err)
     t.ok(/[0-9a-f]{64}/.test(name))
 
@@ -128,7 +128,9 @@ tape('Successful test against beakerbrowser.com (no dns-over-https)', function (
 })
 
 tape('Successful test against beakerbrowser.com (no well-known/dat)', function (t) {
-  datDns.resolveName('beakerbrowser.com', {noWellknownDat: true}, function (err, name) {
+  console.log('running...')
+  datDns.resolveName('beakerbrowser.com', {noWellknownDat: true, ignoreCache: true}, function (err, name) {
+    console.log('res', err, name)
     t.error(err)
     t.ok(/[0-9a-f]{64}/.test(name))
 
