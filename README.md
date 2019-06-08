@@ -7,6 +7,22 @@ Issue DNS lookups for Dat archives using HTTPS requests to the target host. Keep
 ```js
 var datDns = require('dat-dns')()
 
+// or, if you have a custom protocol
+var datDns = require('dat-dns')({
+    recordName: /* name of .well-known file */
+    protocolRegex: /* RegExp object for custom protocol */,
+    hashRegex: /* RegExp object for custom hash i.e. */,
+    txtRegex: /* RegExp object for DNS TXT record of custom protocol */,
+})
+
+// example: 
+var cabalDns = require('dat-dns')({
+    recordName: 'cabal',
+    hashRegex: /^[0-9a-f]{64}?$/i,
+    protocolRegex: /^cabal:\/\/([0-9a-f]{64})/i,
+    txtRegex: /^"?cabalkey=([0-9a-f]{64})"?$/i
+})
+
 // resolve a name: pass the hostname by itself
 datDns.resolveName('foo.com', function (err, key) { ... })
 datDns.resolveName('foo.com').then(key => ...)
