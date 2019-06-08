@@ -38,13 +38,15 @@ module.exports = function (datDnsOpts) {
   var recordName = datDnsOpts.recordName || DAT_RECORD_NAME
   var pCache = datDnsOpts.persistentCache
   var mCache = memoryCache()
+  var dnsHost
+  var dnsPath
   if (!datDnsOpts.dnsHost || !datDnsOpts.dnsPath) {
     let dnsProvider = DEFAULT_DNS_PROVIDERS[Math.floor(Math.random() * DEFAULT_DNS_PROVIDERS.length)]
-    var dnsHost = dnsProvider[0]
-    var dnsPath = dnsProvider[1]
+    dnsHost = dnsProvider[0]
+    dnsPath = dnsProvider[1]
   } else {
-    var dnsHost = datDnsOpts.dnsHost
-    var dnsPath = datDnsOpts.dnsPath
+    dnsHost = datDnsOpts.dnsHost
+    dnsPath = datDnsOpts.dnsPath
   }
 
   var datDns = new Emitter()
@@ -85,13 +87,10 @@ module.exports = function (datDnsOpts) {
         }
 
         var res
-        var key
-        var ttl
-
         if (!noDnsOverHttps) {
           try {
             // do a DNS-over-HTTPS lookup
-            res = yield fetchDnsOverHttpsRecord(name, { host: dnsHost, path: dnsPath })
+            res = yield fetchDnsOverHttpsRecord(datDns, name, { host: dnsHost, path: dnsPath })
 
             // parse the record
             res = parseDnsOverHttpsRecord(datDns, name, res.body, dnsTxtRegex)
@@ -169,7 +168,7 @@ module.exports = function (datDnsOpts) {
   return datDns
 }
 
-function fetchDnsOverHttpsRecord (name, { host, path }) {
+function fetchDnsOverHttpsRecord (datDns, name, { host, path }) {
   return new Promise((resolve, reject) => {
     // ensure the name is a FQDN
     if (!name.includes('.')) {
@@ -179,7 +178,7 @@ function fetchDnsOverHttpsRecord (name, { host, path }) {
         name,
         err: 'Name is not a FQDN'
       })
-      reject('Domain is not a FQDN.')
+      reject(new Error('Domain is not a FQDN.'))
     } else if (!name.endsWith('.')) {
       name = name + '.'
     }
@@ -254,7 +253,7 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
     })
     throw new Error('Invalid dns-over-https record, no TXT answer given')
   }
-  w
+
   // put together res
   var res = { key: answers[0].key, ttl: answers[0].TTL }
   if (!Number.isSafeInteger(res.ttl) || res.ttl < 0) {
