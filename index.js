@@ -10,7 +10,7 @@ const concat = require('concat-stream')
 const DAT_HASH_REGEX = /^[0-9a-f]{64}?$/i
 const DAT_PROTOCOL_REGEX = /^dat:\/\/([0-9a-f]{64})/i
 const DAT_RECORD_NAME = 'dat'
-const DAT_TXT_REGEX = /^"?datkey=([0-9a-f]{64})"?$/i
+const DAT_TXT_REGEX = /"?datkey=([0-9a-f]{64})"?/i
 const VERSION_REGEX = /(\+[^\/]+)$/
 const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
