@@ -14,7 +14,7 @@ const DAT_TXT_REGEX = /"?datkey=([0-9a-f]{64})"?/i
 const VERSION_REGEX = /(\+[^\/]+)$/
 const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
-const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', '/dns-query'], ['dns.google', '/resolve'], ['dns.quad9.net', '/dns-query']]
+const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', 443, '/dns-query'], ['dns.google', 443, '/resolve'], ['dns.quad9.net', 5053, '/dns-query']]
 
 // helper to support node6
 function _asyncToGenerator (fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step (key, arg) { try { var info = gen[key](arg); var value = info.value } catch (error) { reject(error); return } if (info.done) { resolve(value) } else { return Promise.resolve(value).then(function (value) { step('next', value) }, function (err) { step('throw', err) }) } } return step('next') }) } }
@@ -40,13 +40,16 @@ module.exports = function (datDnsOpts) {
   var mCache = memoryCache()
   mCache.init({ttl: 60})
   var dnsHost
+  var dnsPort
   var dnsPath
   if (!datDnsOpts.dnsHost || !datDnsOpts.dnsPath) {
     let dnsProvider = DEFAULT_DNS_PROVIDERS[Math.floor(Math.random() * DEFAULT_DNS_PROVIDERS.length)]
     dnsHost = dnsProvider[0]
-    dnsPath = dnsProvider[1]
+    dnsPort = dnsProvider[1]
+    dnsPath = dnsProvider[2]
   } else {
     dnsHost = datDnsOpts.dnsHost
+    dnsPort = datDnsOpts.dnsPort || 443
     dnsPath = datDnsOpts.dnsPath
   }
 
@@ -91,7 +94,7 @@ module.exports = function (datDnsOpts) {
         if (!noDnsOverHttps) {
           try {
             // do a DNS-over-HTTPS lookup
-            res = yield fetchDnsOverHttpsRecord(datDns, name, { host: dnsHost, path: dnsPath })
+            res = yield fetchDnsOverHttpsRecord(datDns, name, { host: dnsHost, port: dnsPort, path: dnsPath })
 
             // parse the record
             res = parseDnsOverHttpsRecord(datDns, name, res.body, dnsTxtRegex)
@@ -169,7 +172,7 @@ module.exports = function (datDnsOpts) {
   return datDns
 }
 
-function fetchDnsOverHttpsRecord (datDns, name, { host, path }) {
+function fetchDnsOverHttpsRecord (datDns, name, { host, port, path }) {
   return new Promise((resolve, reject) => {
     // ensure the name is a FQDN
     if (!name.includes('.')) {
@@ -190,6 +193,7 @@ function fetchDnsOverHttpsRecord (datDns, name, { host, path }) {
     debug('dns-over-https lookup for name:', name)
     https.get({
       host,
+      port,
       path: `${path}?${stringify(query)}`,
       // Cloudflare requires this exact header; luckily everyone else ignores it
       headers: {
