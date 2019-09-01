@@ -154,9 +154,7 @@ tape('Successful test against beakerbrowser.com (no dns-over-https)', function (
 })
 
 tape('Successful test against beakerbrowser.com (no well-known/dat)', function (t) {
-  console.log('running...')
   datDns.resolveName('beakerbrowser.com', {noWellknownDat: true, ignoreCache: true}, function (err, name) {
-    console.log('res', err, name)
     t.error(err)
     t.ok(/[0-9a-f]{64}/.test(name))
 
