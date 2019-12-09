@@ -38,7 +38,10 @@ module.exports = function (datDnsOpts) {
   var recordName = datDnsOpts.recordName || DAT_RECORD_NAME
   var pCache = datDnsOpts.persistentCache
   var mCache = memoryCache()
-  mCache.init({ttl: 60})
+  mCache.init({
+    ttl: 60,
+    interval: datDnsOpts.cacheCleanSeconds || 60,
+  });
   var dnsHost
   var dnsPort
   var dnsPath
