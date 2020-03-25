@@ -14,7 +14,7 @@ const DAT_TXT_REGEX = /"?datkey=([0-9a-f]{64})"?/i
 const VERSION_REGEX = /(\+[^\/]+)$/
 const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
-const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', 443, '/dns-query'], ['dns.google', 443, '/resolve'], ['dns.quad9.net', 5053, '/dns-query'], ['doh.opendns.com', 443, 'dns-query']]
+const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', 443, '/dns-query'], ['dns.google', 443, '/resolve'], ['dns.quad9.net', 5053, '/dns-query'], ['doh.opendns.com', 443, '/dns-query']]
 
 // helper to support node6
 function _asyncToGenerator (fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step (key, arg) { try { var info = gen[key](arg); var value = info.value } catch (error) { reject(error); return } if (info.done) { resolve(value) } else { return Promise.resolve(value).then(function (value) { step('next', value) }, function (err) { step('throw', err) }) } } return step('next') }) } }
@@ -115,24 +115,58 @@ module.exports = function (datDnsOpts) {
 
         if (!res && !noWellknownDat) {
           // do a .well-known/`${recordName}` lookup
-          res = yield fetchWellKnownRecord(name, recordName)
-          if (res.statusCode === 0 || res.statusCode === 404) {
-            debug('.well-known/' + recordName + ' lookup failed for name:', name, res.statusCode, res.err)
-            datDns.emit('failed', {
-              method: 'well-known',
-              name,
-              err: 'HTTP code ' + res.statusCode + ' ' + res.err
-            })
-            mCache.set(name, false, 60) // cache the miss for a minute
-            throw new Error('DNS record not found')
-          } else if (res.statusCode !== 200) {
-            debug('.well-known/' + recordName + ' lookup failed for name:', name, res.statusCode)
-            datDns.emit('failed', {
-              method: 'well-known',
-              name,
-              err: 'HTTP code ' + res.statusCode
-            })
-            throw new Error('DNS record not found')
+          let redirect_count = 0;
+          let fetch_well_known_host = name;
+          let fetch_well_known_path = recordName;
+
+          while (redirect_count < 7) {
+            res = yield fetchWellKnownRecord(fetch_well_known_host, fetch_well_known_path)
+            if (res.statusCode === 200) {
+              break;
+            } else if (res.statusCode === 0 || res.statusCode === 404) {
+              debug('.well-known/' + recordName + ' lookup failed for name:', name, res.statusCode, res.err)
+              datDns.emit('failed', {
+                method: 'well-known',
+                name,
+                err: 'HTTP code ' + res.statusCode + ' ' + res.err
+              })
+              mCache.set(name, false, 60) // cache the miss for a minute
+              throw new Error('DNS record error or not found')
+            } else if ([301, 302, 307, 308].includes(res.statusCode)) {
+              if (redirect_count >= 6)
+              {
+                debug('.well-known/' + recordName + ' lookup exceeded redirection limit', name, res.statusCode)
+                throw new Error('DNS record lookup exceeded redirection limit')
+              }
+
+              debug('.well-known/' + recordName + ' lookup redirected name:', name, res.statusCode)
+              if (!'location' in res.headers)
+              {
+                debug('.well-known/' + recordName + ' lookup redirect did not contain destination Location header:', name, res.statusCode)
+                throw new Error('DNS record redirected to nowhere')
+              }
+
+              // resolve relative paths with original URL as base URL
+              let redirect_uri = new URL(res.headers['location'], 'https://' + fetch_well_known_host);
+              if (redirect_uri.protocol != 'https:')
+              {
+                debug('.well-known/' + recordName + ' lookup redirected name to protocol other than https:', name, res.statusCode)
+                throw new Error('DNS record redirected to non https: protocol')
+              }
+              fetch_well_known_host = redirect_uri.host
+              fetch_well_known_path = redirect_uri.pathname + redirect_uri.search
+
+              redirect_count++;
+              continue;
+            } else if (res.statusCode !== 200) {
+              debug('.well-known/' + recordName + ' lookup failed for name:', name, res.statusCode)
+              datDns.emit('failed', {
+                method: 'well-known',
+                name,
+                err: 'HTTP code ' + res.statusCode
+              })
+              throw new Error('DNS record did not return OK status')
+            }
           }
 
           // parse the record
@@ -276,13 +310,17 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
 function fetchWellKnownRecord (name, recordName) {
   return new Promise((resolve, reject) => {
     debug('.well-known/dat lookup for name:', name)
+    if (!recordName.startsWith('/'))
+    {
+      recordName = '/.well-known/' + recordName
+    }
     https.get({
       host: name,
-      path: '/.well-known/' + recordName,
+      path: recordName,
       timeout: 2000
     }, function (res) {
       res.setEncoding('utf-8')
-      res.pipe(concat(body => resolve({ statusCode: res.statusCode, body })))
+      res.pipe(concat(body => resolve({ statusCode: res.statusCode, headers: res.headers, body })))
     }).on('error', function (err) {
       resolve({ statusCode: 0, err, body: '' })
     })
