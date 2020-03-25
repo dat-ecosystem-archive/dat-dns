@@ -168,8 +168,23 @@ tape('Successful test against beakerbrowser.com (no well-known/dat)', function (
   })
 })
 
+tape('Successful test against staltz.com (well-known redirects)', function (t) {
+  datDns.resolveName('staltz.com', {noDnsOverHttps: true, ignoreCache: true}, function (err, name) {
+    t.error(err)
+    t.ok(/[0-9a-f]{64}/.test(name))
+
+    datDns.resolveName('staltz.com').then(function (name2) {
+      t.equal(name, name2)
+      t.end()
+    }).catch(function (err) {
+      t.error(err)
+      t.end()
+    })
+  })
+})
+
 tape('List cache', function (t) {
-  t.is(Object.keys(datDns.listCache()).length, 6)
+  t.is(Object.keys(datDns.listCache()).length, 7)
   t.end()
 })
 
