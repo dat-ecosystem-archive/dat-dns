@@ -8,8 +8,6 @@ var cabalDns = createDatDNS({
     txtRegex: /^"?cabalkey=([0-9a-f]{64})"?$/i
 })
 
-var FAKE_DAT = 'f'.repeat(64)
-
 tape('Successful test against cblgh.org', function (t) {
   cabalDns.resolveName('cblgh.org', function (err, name) {
     t.error(err)
@@ -195,6 +193,40 @@ tape('Successful test against dns-test-setup.dat-ecosystem.org (no well-known/da
       t.end()
     })
   })
+})
+
+tape('Successful test against dns-test-setup-2.dat-ecosystem.org (well-known, multiple, , redirects)', function (t) {
+  const datDnsHop3 = require('./index')({ recordName: 'dat-hop-3' })
+  datDnsHop3.resolveName('dns-test-setup-2.dat-ecosystem.org', {noDnsOverHttps: true, ignoreCache: true })
+    .then(name => {
+      t.equals(name, '222231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde222')
+      return datDnsHop3.resolveName('dns-test-setup-2.dat-ecosystem.org')
+        .then(name2 => {
+          t.equal(name, name2)
+          t.end()
+        })
+    })
+    .catch(err => {
+      t.error(err)
+      t.end()
+    })
+})
+
+tape('Fail test against dns-test-setup-2.dat-ecosystem.org (well-known, multiple, exceeding redirects)', function (t) {
+  const datDnsHop3 = require('./index')({ recordName: 'dat-hop-3' })
+  datDnsHop3.resolveName('dns-test-setup-2.dat-ecosystem.org', {noDnsOverHttps: true, ignoreCache: true, followRedirects: 2})
+    .then(name => {
+      t.equals(name, '222231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde222')
+      return datDnsHop3.resolveName('dns-test-setup-2.dat-ecosystem.org')
+        .then(() => {
+          t.fail('Dont expect to succeed')
+          t.end()
+        })
+    })
+    .catch(err => {
+      t.equals(err.message, 'Well known record lookup exceeded redirection limit: 2')
+      t.end()
+    })
 })
 
 tape('List cache', function (t) {

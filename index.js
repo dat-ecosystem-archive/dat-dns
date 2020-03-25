@@ -15,6 +15,7 @@ const VERSION_REGEX = /(\+[^\/]+)$/
 const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
 const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', 443, '/dns-query'], ['dns.google', 443, '/resolve']]
+const DEFAULT_FOLLOW_REDIRECTS = 6
 
 module.exports = createDatDNS
 
@@ -69,6 +70,7 @@ function createDatDNS (datDnsOpts) {
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
     var noDnsOverHttps = opts && opts.noDnsOverHttps
     var noWellknownDat = opts && opts.noWellknownDat
+    var followRedirects = (opts && opts.followRedirects) || DEFAULT_FOLLOW_REDIRECTS
     return maybe(cb, _asyncToGenerator(function * () {
       // parse the name as needed
       var nameParsed = url.parse(name)
@@ -117,7 +119,10 @@ function createDatDNS (datDnsOpts) {
 
         if (!res && !noWellknownDat) {
           // do a .well-known/`${recordName}` lookup
-          res = yield fetchWellKnownRecord(name, recordName)
+          const wellknownPath = !recordName.startsWith('/')
+            ? '/.well-known/' + recordName
+            : recordName
+          res = yield fetchWellKnownRecordWithRedirects(recordName, name, wellknownPath, followRedirects)
           if (res.statusCode === 0 || res.statusCode === 404) {
             debug('.well-known/' + recordName + ' lookup failed for name:', name, res.statusCode, res.err)
             datDns.emit('failed', {
@@ -280,16 +285,39 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
   return res
 }
 
-function fetchWellKnownRecord (name, recordName) {
-  return new Promise((resolve, reject) => {
-    debug('.well-known/dat lookup for name:', name)
-    https.get({
-      host: name,
-      path: '/.well-known/' + recordName,
-      timeout: 2000
-    }, function (res) {
+function fetchWellKnownRecordWithRedirects (recordName, host, path, followRedirects) {
+  return _asyncToGenerator(function * () {
+    let redirectCount = 0
+    while (redirectCount < followRedirects) {
+      const res = yield fetchWellKnownRecord(recordName, host, path)
+      if ([301, 302, 307, 308].includes(res.statusCode)) {
+        if (!'location' in res.headers) {
+          debug('.well-known/' + recordName + ' lookup redirect did not contain destination Location header.')
+          throw new Error('Well record redirected to nowhere')
+        }
+        // resolve relative paths with original URL as base URL
+        const uri = new URL(res.headers['location'], 'https://' + host)
+        if (uri.protocol !== 'https:') {
+          throw new Error('DNS record redirected to non https: protocol: ' + uri.href)
+        }
+        host = uri.host
+        path = uri.pathname + uri.search
+        redirectCount++
+        debug('.well-known/' + recordName + ' lookup redirected to https://' + host + path, '(' + res.statusCode + ') [' + redirectCount + '/' + followRedirects + ']')
+      } else {
+        return res
+      }
+    }
+    throw new Error('Well known record lookup exceeded redirection limit: ' + followRedirects)
+  })()
+}
+
+function fetchWellKnownRecord (recordName, host, path) {
+  return new Promise(resolve => {
+    debug('.well-known/' + recordName + ' lookup at https://' + host + path)
+    https.get({ host, path, timeout: 2000 }, function (res) {
       res.setEncoding('utf-8')
-      res.pipe(concat(body => resolve({ statusCode: res.statusCode, body })))
+      res.pipe(concat(body => resolve({ statusCode: res.statusCode, body, headers: res.headers })))
     }).on('error', function (err) {
       resolve({ statusCode: 0, err, body: '' })
     })
