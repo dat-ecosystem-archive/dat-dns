@@ -222,7 +222,7 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
   try {
     record = JSON.parse(body)
   } catch (e) {
-    debug('dns-over-https failed', name, 'did not give a valid JSON response')
+    debug('dns-over-https failed', name, 'did not give a valid JSON response', body)
     datDns.emit('failed', {
       method: 'dns-over-https',
       name,
