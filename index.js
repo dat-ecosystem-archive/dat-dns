@@ -197,7 +197,7 @@ function fetchDnsOverHttpsRecord (datDns, name, { host, port, path }) {
       name,
       type: 'TXT'
     }
-    debug('dns-over-https lookup for name:', name)
+    debug('dns-over-https lookup for name:', name, 'at', host + ':' + port + path)
     https.get({
       host,
       port,
