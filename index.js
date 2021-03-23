@@ -256,6 +256,9 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
     a.key = match[1]
     return true
   })
+    // Open DNS servers are not consistent in the ordering of TXT entries.
+    // In order to have a consistent behavior we sort keys in case we find multiple.
+    .sort((a, b) => a.key < b.key ? 1 : a.key > b.key ? -1 : 0)
   if (!answers[0]) {
     debug('dns-over-https failed', name, 'did not give any TXT answers')
     datDns.emit('failed', {
