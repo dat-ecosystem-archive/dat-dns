@@ -234,13 +234,13 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
   // find valid answers
   var answers = record['Answer']
   if (!answers || !Array.isArray(answers)) {
-    debug('dns-over-https failed', name, 'did not give any TXT answers')
+    debug('dns-over-https failed', name, 'did not give any answers')
     datDns.emit('failed', {
       method: 'dns-over-https',
       name,
       err: 'Did not give any TXT answers'
     })
-    throw new Error('Invalid dns-over-https record, no TXT answers given')
+    throw new Error('Invalid dns-over-https record, no answers given')
   }
   answers = answers.filter(a => {
     if (!a || typeof a !== 'object') {
