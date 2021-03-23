@@ -123,12 +123,12 @@ tape('Unqualified domain fails gracefully', function (t) {
   })
 })
 
-tape('Successful test against beakerbrowser.com', function (t) {
-  datDns.resolveName('beakerbrowser.com', {ignoreCache: true}, function (err, name) {
+tape('Successful test against dns-test-setup.dat-ecosystem.org', function (t) {
+  datDns.resolveName('dns-test-setup.dat-ecosystem.org', {ignoreCache: true}, function (err, name) {
     t.error(err)
-    t.ok(/[0-9a-f]{64}/.test(name))
+    t.equals(name, '444231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde444')
 
-    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+    datDns.resolveName('dns-test-setup.dat-ecosystem.org').then(function (name2) {
       t.equal(name, name2)
       t.end()
     }).catch(function (err) {
@@ -138,12 +138,12 @@ tape('Successful test against beakerbrowser.com', function (t) {
   })
 })
 
-tape('Successful test against beakerbrowser.com (no dns-over-https)', function (t) {
-  datDns.resolveName('beakerbrowser.com', {noDnsOverHttps: true, ignoreCache: true}, function (err, name) {
+tape('Successful test against dns-test-setup.dat-ecosystem.org (no dns-over-https)', function (t) {
+  datDns.resolveName('dns-test-setup.dat-ecosystem.org', {noDnsOverHttps: true, ignoreCache: true}, function (err, name) {
     t.error(err)
-    t.ok(/[0-9a-f]{64}/.test(name))
+    t.equals(name, '111231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde111')
 
-    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+    datDns.resolveName('dns-test-setup.dat-ecosystem.org').then(function (name2) {
       t.equal(name, name2)
       t.end()
     }).catch(function (err) {
@@ -153,12 +153,12 @@ tape('Successful test against beakerbrowser.com (no dns-over-https)', function (
   })
 })
 
-tape('Successful test against beakerbrowser.com (no well-known/dat)', function (t) {
-  datDns.resolveName('beakerbrowser.com', {noWellknownDat: true, ignoreCache: true}, function (err, name) {
+tape('Successful test against dns-test-setup.dat-ecosystem.org (no well-known/dat)', function (t) {
+  datDns.resolveName('dns-test-setup.dat-ecosystem.org', {noWellknownDat: true, ignoreCache: true}, function (err, name) {
     t.error(err)
-    t.ok(/[0-9a-f]{64}/.test(name))
+    t.equal(name, '444231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde444' /* the second txt entry */)
 
-    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+    datDns.resolveName('dns-test-setup.dat-ecosystem.org').then(function (name2) {
       t.equal(name, name2)
       t.end()
     }).catch(function (err) {
