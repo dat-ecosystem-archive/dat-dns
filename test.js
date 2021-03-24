@@ -1,6 +1,7 @@
 var tape = require('tape')
-var datDns = require('./index')()
-var cabalDns = require('./index')({
+var createDatDNS = require('./index')
+var datDns = createDatDNS()
+var cabalDns = createDatDNS({
     hashRegex: /^[0-9a-f]{64}?$/i,
     recordName: 'cabal',
     protocolRegex: /^cabal:\/\/([0-9a-f]{64})/i,
@@ -123,12 +124,12 @@ tape('Unqualified domain fails gracefully', function (t) {
   })
 })
 
-tape('Successful test against beakerbrowser.com', function (t) {
-  datDns.resolveName('beakerbrowser.com', {ignoreCache: true}, function (err, name) {
+tape('Successful test against dns-test-setup.dat-ecosystem.org', function (t) {
+  datDns.resolveName('dns-test-setup.dat-ecosystem.org', {ignoreCache: true}, function (err, name) {
     t.error(err)
-    t.ok(/[0-9a-f]{64}/.test(name))
+    t.equals(name, '444231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde444')
 
-    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+    datDns.resolveName('dns-test-setup.dat-ecosystem.org').then(function (name2) {
       t.equal(name, name2)
       t.end()
     }).catch(function (err) {
@@ -138,27 +139,55 @@ tape('Successful test against beakerbrowser.com', function (t) {
   })
 })
 
-tape('Successful test against beakerbrowser.com (no dns-over-https)', function (t) {
-  datDns.resolveName('beakerbrowser.com', {noDnsOverHttps: true, ignoreCache: true}, function (err, name) {
-    t.error(err)
-    t.ok(/[0-9a-f]{64}/.test(name))
-
-    datDns.resolveName('beakerbrowser.com').then(function (name2) {
-      t.equal(name, name2)
-      t.end()
-    }).catch(function (err) {
-      t.error(err)
-      t.end()
+tape('Successful test against dns-test-setup.dat-ecosystem.org (no dns-over-https)', function (t) {
+  datDns.resolveName('dns-test-setup.dat-ecosystem.org', {noDnsOverHttps: true, ignoreCache: true})
+    .then(function (name) {
+      t.equals(name, '111231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde111')
+      return datDns.resolveName('dns-test-setup.dat-ecosystem.org')
+        .then(function (name2) {
+          t.equal(name, name2)
+        })
     })
+    .then(
+      function () { t.end() },
+      function (err) {
+        t.error(err)
+        t.end()
+      }
+    )
+})
+
+createDatDNS.DEFAULT_DNS_PROVIDERS.forEach(function (provider) {
+  const dns = createDatDNS({
+    dnsHost: provider[0],
+    dnsPort: provider[1],
+    dnsPath: provider[2]
+  })
+  tape('Successful test against dns-test-setup.dat-ecosystem.org (no well-known/dat) (' + provider[0] + ':' + provider[1] + provider[2] + ')', function (t) {
+    dns.resolveName('dns-test-setup.dat-ecosystem.org', {noWellknownDat: true, ignoreCache: true})
+      .then(function (name) {
+        t.equal(name, '444231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde444' /* the second txt entry */)
+        return dns.resolveName('dns-test-setup.dat-ecosystem.org')
+          .then(function (name2) {
+            t.equal(name, name2, 'cache test')
+          })
+      })
+      .then(
+        function () { t.end() },
+        function (err) {
+          t.error(err)
+          t.end()
+        }
+      )
   })
 })
 
-tape('Successful test against beakerbrowser.com (no well-known/dat)', function (t) {
-  datDns.resolveName('beakerbrowser.com', {noWellknownDat: true, ignoreCache: true}, function (err, name) {
+tape('Successful test against dns-test-setup.dat-ecosystem.org (no well-known/dat)', function (t) {
+  datDns.resolveName('dns-test-setup.dat-ecosystem.org', {noWellknownDat: true, ignoreCache: true}, function (err, name) {
     t.error(err)
-    t.ok(/[0-9a-f]{64}/.test(name))
+    t.equal(name, '444231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde444' /* the second txt entry */)
 
-    datDns.resolveName('beakerbrowser.com').then(function (name2) {
+    datDns.resolveName('dns-test-setup.dat-ecosystem.org').then(function (name2) {
       t.equal(name, name2)
       t.end()
     }).catch(function (err) {
@@ -187,7 +216,7 @@ tape('Persistent fallback cache', function (t) {
     }
   }
 
-  var datDns = require('./index')({persistentCache})
+  var datDns = createDatDNS({persistentCache})
 
   datDns.resolveName('pfrazee.hashbase.io', function (err, key) {
     t.error(err)
@@ -216,7 +245,7 @@ tape('Persistent fallback cache doesnt override live results', function (t) {
     write: function (name, key, ttl) {}
   }
 
-  var datDns = require('./index')({persistentCache})
+  var datDns = createDatDNS({persistentCache})
 
   datDns.resolveName('pfrazee.hashbase.io', function (err, key) {
     t.error(err)

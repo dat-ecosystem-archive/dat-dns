@@ -14,7 +14,9 @@ const DAT_TXT_REGEX = /"?datkey=([0-9a-f]{64})"?/i
 const VERSION_REGEX = /(\+[^\/]+)$/
 const DEFAULT_DAT_DNS_TTL = 3600 // 1hr
 const MAX_DAT_DNS_TTL = 3600 * 24 * 7 // 1 week
-const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', 443, '/dns-query'], ['dns.google', 443, '/resolve'], ['dns.quad9.net', 5053, '/dns-query'], ['doh.opendns.com', 443, 'dns-query']]
+const DEFAULT_DNS_PROVIDERS = [['cloudflare-dns.com', 443, '/dns-query'], ['dns.google', 443, '/resolve']]
+
+module.exports = createDatDNS
 
 // helper to support node6
 function _asyncToGenerator (fn) { return function () { var gen = fn.apply(this, arguments); return new Promise(function (resolve, reject) { function step (key, arg) { try { var info = gen[key](arg); var value = info.value } catch (error) { reject(error); return } if (info.done) { resolve(value) } else { return Promise.resolve(value).then(function (value) { step('next', value) }, function (err) { step('throw', err) }) } } return step('next') }) } }
@@ -27,7 +29,7 @@ function maybe (cb, p) {
   return callMeMaybe(cb, p)
 }
 
-module.exports = function (datDnsOpts) {
+function createDatDNS (datDnsOpts) {
   datDnsOpts = datDnsOpts || {}
   if (datDnsOpts.hashRegex && !(datDnsOpts.hashRegex instanceof RegExp)) { throw new Error('opts.hashRegex must be a RegExp object') }
   if (datDnsOpts.txtRegex && !(datDnsOpts.txtRegex instanceof RegExp)) { throw new Error('opts.txtRegex must be a RegExp object') }
@@ -175,6 +177,8 @@ module.exports = function (datDnsOpts) {
   return datDns
 }
 
+createDatDNS.DEFAULT_DNS_PROVIDERS = DEFAULT_DNS_PROVIDERS
+
 function fetchDnsOverHttpsRecord (datDns, name, { host, port, path }) {
   return new Promise((resolve, reject) => {
     // ensure the name is a FQDN
@@ -193,7 +197,7 @@ function fetchDnsOverHttpsRecord (datDns, name, { host, port, path }) {
       name,
       type: 'TXT'
     }
-    debug('dns-over-https lookup for name:', name)
+    debug('dns-over-https lookup for name:', name, 'at', host + ':' + port + path)
     https.get({
       host,
       port,
@@ -218,7 +222,7 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
   try {
     record = JSON.parse(body)
   } catch (e) {
-    debug('dns-over-https failed', name, 'did not give a valid JSON response')
+    debug('dns-over-https failed', name, 'did not give a valid JSON response', body)
     datDns.emit('failed', {
       method: 'dns-over-https',
       name,
@@ -230,13 +234,13 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
   // find valid answers
   var answers = record['Answer']
   if (!answers || !Array.isArray(answers)) {
-    debug('dns-over-https failed', name, 'did not give any TXT answers')
+    debug('dns-over-https failed', name, 'did not give any answers')
     datDns.emit('failed', {
       method: 'dns-over-https',
       name,
       err: 'Did not give any TXT answers'
     })
-    throw new Error('Invalid dns-over-https record, no TXT answers given')
+    throw new Error('Invalid dns-over-https record, no answers given')
   }
   answers = answers.filter(a => {
     if (!a || typeof a !== 'object') {
@@ -252,6 +256,9 @@ function parseDnsOverHttpsRecord (datDns, name, body, dnsTxtRegex) {
     a.key = match[1]
     return true
   })
+    // Open DNS servers are not consistent in the ordering of TXT entries.
+    // In order to have a consistent behavior we sort keys in case we find multiple.
+    .sort((a, b) => a.key < b.key ? 1 : a.key > b.key ? -1 : 0)
   if (!answers[0]) {
     debug('dns-over-https failed', name, 'did not give any TXT answers')
     datDns.emit('failed', {
