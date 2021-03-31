@@ -70,7 +70,7 @@ function createDatDNS (datDnsOpts) {
     var ignoreCachedMiss = opts && opts.ignoreCachedMiss
     var noDnsOverHttps = opts && opts.noDnsOverHttps
     var noWellknownDat = opts && opts.noWellknownDat
-    var followRedirects = (opts && opts.followRedirects) || DEFAULT_FOLLOW_REDIRECTS
+    var followRedirects = (opts && opts.followRedirects >= 0) ? opts.followRedirects : DEFAULT_FOLLOW_REDIRECTS
     return maybe(cb, _asyncToGenerator(function * () {
       // parse the name as needed
       var nameParsed = url.parse(name)

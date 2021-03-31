@@ -229,6 +229,23 @@ tape('Fail test against dns-test-setup-2.dat-ecosystem.org (well-known, multiple
     })
 })
 
+tape('Fail with zero redirects dns-test-setup-2.dat-ecosystem.org (well-known, multiple, exceeding redirects)', function (t) {
+  const datDnsHop3 = require('./index')({ recordName: 'dat-hop-3' })
+  datDnsHop3.resolveName('dns-test-setup-2.dat-ecosystem.org', {noDnsOverHttps: true, ignoreCache: true, followRedirects: 0})
+    .then(name => {
+      t.equals(name, '222231b5589a5099aa3610a8ee550dcd454c3e33f4cac93b7d41b6b850cde222')
+      return datDnsHop3.resolveName('dns-test-setup-2.dat-ecosystem.org')
+        .then(() => {
+          t.fail('Dont expect to succeed')
+          t.end()
+        })
+    })
+    .catch(err => {
+      t.equals(err.message, 'Well known record lookup exceeded redirection limit: 0')
+      t.end()
+    })
+})
+
 tape('List cache', function (t) {
   t.is(Object.keys(datDns.listCache()).length, 6)
   t.end()
