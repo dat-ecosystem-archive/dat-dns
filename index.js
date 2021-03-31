@@ -292,13 +292,12 @@ function fetchWellKnownRecordWithRedirects (recordName, host, path, followRedire
       const res = yield fetchWellKnownRecord(recordName, host, path)
       if ([301, 302, 307, 308].includes(res.statusCode)) {
         if (!'location' in res.headers) {
-          debug('.well-known/' + recordName + ' lookup redirect did not contain destination Location header.')
-          throw new Error('Well record redirected to nowhere')
+          throw new Error('well-known lookup at', host + path , 'redirected (' + res.statusCode + ') to nowhere')
         }
         // resolve relative paths with original URL as base URL
         const uri = new URL(res.headers['location'], 'https://' + host)
         if (uri.protocol !== 'https:') {
-          throw new Error('DNS record redirected to non https: protocol: ' + uri.href)
+          throw new Error('well-known lookup at', host + path , 'redirected (' + res.statusCode + ') to non-https location')
         }
         host = uri.host
         path = uri.pathname + uri.search
