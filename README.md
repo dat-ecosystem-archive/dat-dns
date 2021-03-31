@@ -39,7 +39,7 @@ datDns.resolveName('foo.com', {noDnsOverHttps: true})
 // dont use .well-known/dat
 datDns.resolveName('foo.com', {noWellknownDat: true})
 
-// specify amount of redirects (default: 7)
+// specify amount of redirects (default: 6)
 datDns.resolveName('foo.com', { followRedirects: 2 })
 
 // list all entries in the cache
